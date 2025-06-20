@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQ会計シミュレーター v1.01</title>
+    <!-- Tailwind CSSの読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムスタイル */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* スライダーのつまみのスタイル */
+        .range-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--thumb-color, #ffffff);
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #1e293b;
+            transition: background .2s;
+        }
+        .range-thumb::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--thumb-color, #ffffff);
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #1e293b;
+            transition: background .2s;
+        }
+        /* フェードインアニメーション */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <!-- Google Fontsの読み込み -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-white">
+
+    <div class="p-4 sm:p-8 flex flex-col items-center">
+        <div class="w-full max-w-6xl mx-auto">
+            <header class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-cyan-400">MQ会計シミュレーター</h1>
+                <p class="text-slate-400 mt-2">経営数値を可視化し、利益計画を立てましょう。</p>
+            </header>
+
+            <!-- タブナビゲーション -->
+            <div class="flex justify-center border-b border-slate-700 mb-6">
+                <button id="btn-data-tab" class="px-6 py-3 text-lg font-semibold transition-all duration-300 ease-in-out border-b-4 text-cyan-400 border-cyan-400">
+                    データ入力
+                </button>
+                <button id="btn-sim-tab" class="px-6 py-3 text-lg font-semibold transition-all duration-300 ease-in-out border-b-4 text-slate-400 border-transparent hover:text-white hover:border-slate-500">
+                    シミュレーション
+                </button>
+            </div>
+
+            <!-- タブコンテンツ -->
+            <main>
+                <!-- データ入力タブ -->
+                <div id="data-tab" class="bg-slate-800 p-6 rounded-2xl shadow-lg animate-fade-in">
+                    <h2 class="text-2xl font-bold text-white mb-6 text-center">会計データの入力</h2>
+                    <div class="flex flex-col lg:flex-row justify-center items-center gap-6">
+                        <!-- Left side: P, V, M, Q -->
+                        <div class="flex items-center gap-4">
+                            <div class="flex flex-col gap-2 w-48">
+                                <div class="data-box bg-slate-700/80"><span class="label">P (単価)</span><input type="number" id="data-p" class="value-input"></div>
+                                <div class="data-box bg-slate-700/80"><span class="label">V (変動費)</span><input type="number" id="data-v" class="value-input"></div>
+                                <div class="data-box bg-cyan-900/50"><span class="label highlight">M (限界利益)</span><span id="data-m" class="value-display highlight"></span></div>
+                            </div>
+                            <div class="text-4xl font-thin text-slate-500">×</div>
+                            <div class="flex flex-col gap-2 w-48">
+                                <div class="data-box bg-slate-700/80"><span class="label">Q (数量)</span><input type="number" id="data-q" class="value-input"></div>
+                            </div>
+                        </div>
+                        <div class="text-4xl font-thin text-slate-500 hidden lg:block">=</div>
+                        <!-- Right side: Results -->
+                        <div class="bg-slate-700/50 p-4 rounded-lg flex-grow w-full lg:w-auto">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                               <div class="data-box bg-slate-700/80 col-span-1 lg:col-span-1"><span class="label">PQ (売上高)</span><span id="data-pq" class="value-display"></span></div>
+                               <div class="data-box bg-slate-700/80"><span class="label">VQ (変動費合計)</span><span id="data-vq" class="value-display"></span></div>
+                               <div class="data-box bg-cyan-900/50"><span class="label highlight">MQ (限界利益総額)</span><span id="data-mq" class="value-display highlight"></span></div>
+                               <div class="data-box bg-slate-700/80"><span class="label">F (固定費)</span><input type="number" id="data-f" class="value-input"></div>
+                               <div class="data-box bg-cyan-900/50 large"><span class="label highlight large">G (利益)</span><span id="data-g" class="value-display highlight large"></span></div>
+                               <div class="data-box bg-cyan-900/50"><span class="label highlight">利益率</span><span id="data-profit-margin" class="value-display highlight"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- シミュレーションタブ -->
+                <div id="sim-tab" class="hidden p-6 rounded-2xl shadow-lg transition-all duration-500 ease-in-out">
+                    <h2 class="text-2xl font-bold text-white mb-4 text-center">利益シミュレーション</h2>
+                    <div id="sim-status" class="text-center mb-6 p-3 rounded-lg transition-all duration-500">
+                        <h3 id="sim-status-text" class="text-xl font-bold"></h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div id="sim-slider-p"></div>
+                        <div id="sim-slider-v"></div>
+                        <div id="sim-slider-q"></div>
+                        <div id="sim-slider-f"></div>
+                    </div>
+                    
+                    <div class="mt-8 pt-6 border-t-2 border-slate-700/50">
+                        <div id="sim-slider-g"></div>
+                    </div>
+
+                    <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                         <!-- Intermediate Metrics -->
+                        <div class="p-6 bg-slate-900/70 rounded-xl">
+                             <h4 class="text-lg font-semibold text-slate-300 mb-3 text-center">シミュレーション指標</h4>
+                             <div class="space-y-3">
+                                <div class="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg">
+                                    <span class="font-semibold text-slate-300">PQ (売上高)</span>
+                                    <span id="sim-pq" class="font-mono text-xl text-white"></span>
+                                </div>
+                                <div class="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg">
+                                    <span class="font-semibold text-cyan-300">利益率</span>
+                                    <span id="sim-profit-margin" class="font-mono text-xl text-cyan-300"></span>
+                                </div>
+                             </div>
+                        </div>
+                        <!-- Final Result -->
+                        <div class="p-6 bg-slate-900/70 rounded-xl">
+                            <h4 class="text-lg font-semibold text-slate-300 mb-3 text-center">シミュレーション結果</h4>
+                            <div class="flex justify-center items-baseline gap-4 mt-2">
+                                <p id="sim-result-g" class="text-3xl font-mono font-bold text-white"></p>
+                                <span class="text-slate-400">/</span>
+                                <p id="sim-target-g" class="text-3xl font-mono font-bold text-cyan-400"></p>
+                            </div>
+                            <p class="text-sm text-slate-500 mt-1 text-center">(計算上の利益 / 目標利益)</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+        <footer class="text-center mt-12 text-slate-500 text-sm">
+            <p>MQ Accounting Simulator v1.01</p>
+        </footer>
+    </div>
+
+    <!-- 共通のスタイルを定義 -->
+    <style>
+      .data-box { padding: 0.75rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .data-box.large { font-size: 1.125rem; }
+      .label { font-weight: 600; color: #cbd5e1; }
+      .label.highlight { color: #67e8f9; }
+      .value-input { background-color: #0f172a; color: white; width: 7rem; text-align: right; padding: 0.5rem; border-radius: 0.375rem; border: 2px solid #475569; transition: all 0.2s; }
+      .value-input:focus { border-color: #06b6d4; outline: none; box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.5); }
+      .value-display { font-family: monospace; font-size: 1.125rem; color: white; }
+      .value-display.large { font-size: 1.25rem; }
+      .value-display.highlight { color: #67e8f9; }
+    </style>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // ---------------------------------
+        // State Management
+        // ---------------------------------
+        const state = {
+            activeTab: 'data',
+            dataValues: { p: 2000, v: 1000, q: 10, f: 5000 },
+            simValues: {},
+            targetG: 0
+        };
+
+        // ---------------------------------
+        // DOM Elements
+        // ---------------------------------
+        const elements = {
+            btnDataTab: document.getElementById('btn-data-tab'),
+            btnSimTab: document.getElementById('btn-sim-tab'),
+            dataTab: document.getElementById('data-tab'),
+            simTab: document.getElementById('sim-tab'),
+            
+            dataP: document.getElementById('data-p'), dataV: document.getElementById('data-v'),
+            dataQ: document.getElementById('data-q'), dataF: document.getElementById('data-f'),
+            
+            dataM: document.getElementById('data-m'), dataPQ: document.getElementById('data-pq'),
+            dataVQ: document.getElementById('data-vq'), dataMQ: document.getElementById('data-mq'),
+            dataG: document.getElementById('data-g'), dataProfitMargin: document.getElementById('data-profit-margin'),
+
+            simStatus: document.getElementById('sim-status'),
+            simStatusText: document.getElementById('sim-status-text'),
+            simResultG: document.getElementById('sim-result-g'),
+            simTargetG: document.getElementById('sim-target-g'),
+            simPq: document.getElementById('sim-pq'),
+            simProfitMargin: document.getElementById('sim-profit-margin'),
+        };
+
+        // ---------------------------------
+        // Calculations
+        // ---------------------------------
+        const calculateMetrics = (values) => {
+            const { p, v, q, f } = values;
+            const m = p - v;
+            const pq = p * q;
+            const vq = v * q;
+            const mq = m * q;
+            const g = mq - f;
+            const profitMargin = pq !== 0 ? (g / pq) * 100 : 0;
+            return { m, pq, vq, mq, g, profitMargin };
+        };
+
+        const getStep = (value) => {
+            if (value === 0) return 1;
+            const orderOfMagnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(value))));
+            return Math.max(1, orderOfMagnitude / 100);
+        };
+
+        const debounce = (func, delay = 250) => {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => { func.apply(this, args); }, delay);
+            };
+        };
+
+        // ---------------------------------
+        // UI Update Functions
+        // ---------------------------------
+        const updateUI = () => {
+            const dataCalcs = calculateMetrics(state.dataValues);
+            elements.dataP.value = state.dataValues.p;
+            elements.dataV.value = state.dataValues.v;
+            elements.dataQ.value = state.dataValues.q;
+            elements.dataF.value = state.dataValues.f;
+            
+            elements.dataM.textContent = dataCalcs.m.toLocaleString();
+            elements.dataPQ.textContent = dataCalcs.pq.toLocaleString();
+            elements.dataVQ.textContent = dataCalcs.vq.toLocaleString();
+            elements.dataMQ.textContent = dataCalcs.mq.toLocaleString();
+            elements.dataG.textContent = dataCalcs.g.toLocaleString();
+            elements.dataProfitMargin.textContent = `${dataCalcs.profitMargin.toFixed(2)}%`;
+
+            const simCalcs = calculateMetrics(state.simValues);
+            // MODIFIED: Change condition to "greater than or equal to"
+            const isTargetAchieved = simCalcs.g >= state.targetG;
+
+            updateSimSlider('p', 'P (単価)', state.simValues.p, 0, state.dataValues.p * 2, getStep(state.dataValues.p));
+            updateSimSlider('v', 'V (変動費)', state.simValues.v, 0, state.dataValues.v * 2, getStep(state.dataValues.v));
+            updateSimSlider('q', 'Q (数量)', state.simValues.q, 0, state.dataValues.q * 5, getStep(state.dataValues.q));
+            updateSimSlider('f', 'F (固定費)', state.simValues.f, 0, state.dataValues.f * 2, getStep(state.dataValues.f));
+            updateSimSlider('g', 'G (目標利益)', state.targetG, -state.dataValues.f, (state.dataValues.p * state.dataValues.q) / 2, getStep(state.dataValues.f), true);
+
+            elements.simResultG.textContent = simCalcs.g.toLocaleString();
+            elements.simTargetG.textContent = state.targetG.toLocaleString();
+            elements.simPq.textContent = simCalcs.pq.toLocaleString();
+            elements.simProfitMargin.textContent = `${simCalcs.profitMargin.toFixed(2)}%`;
+
+            if (isTargetAchieved) {
+                elements.simTab.classList.remove('bg-red-900/50'); elements.simTab.classList.add('bg-blue-900/50');
+                elements.simStatus.classList.remove('bg-red-400', 'text-red-950'); elements.simStatus.classList.add('bg-blue-400', 'text-blue-950');
+                elements.simStatusText.textContent = '🎉 目標達成！';
+            } else {
+                elements.simTab.classList.add('bg-red-900/50'); elements.simTab.classList.remove('bg-blue-900/50');
+                elements.simStatus.classList.add('bg-red-400', 'text-red-950'); elements.simStatus.classList.remove('bg-blue-400', 'text-blue-950');
+                elements.simStatusText.textContent = '目標利益をシミュレーション中...';
+            }
+
+            if(state.activeTab === 'data') {
+                elements.dataTab.style.display = 'block'; elements.simTab.style.display = 'none';
+                elements.btnDataTab.classList.add('text-cyan-400', 'border-cyan-400'); elements.btnDataTab.classList.remove('text-slate-400', 'border-transparent');
+                elements.btnSimTab.classList.add('text-slate-400', 'border-transparent'); elements.btnSimTab.classList.remove('text-cyan-400', 'border-cyan-400');
+            } else {
+                elements.dataTab.style.display = 'none'; elements.simTab.style.display = 'block';
+                elements.btnSimTab.classList.add('text-cyan-400', 'border-cyan-400'); elements.btnSimTab.classList.remove('text-slate-400', 'border-transparent');
+                elements.btnDataTab.classList.add('text-slate-400', 'border-transparent'); elements.btnDataTab.classList.remove('text-cyan-400', 'border-cyan-400');
+            }
+        };
+        
+        const updateSimSlider = (field, label, value, min, max, step, isTarget = false) => {
+            const container = document.getElementById(`sim-slider-${field}`);
+            const thumbColor = isTarget ? '#22d3ee' : '#ffffff';
+            const labelColor = isTarget ? 'text-cyan-300' : 'text-slate-300';
+            const html = `<div class="space-y-2"><div class="flex justify-between items-baseline"><label class="font-semibold ${labelColor}">${label}</label><input type="number" data-field="${field}" value="${value}" class="value-input sim-input-number"></div><input type="range" data-field="${field}" min="${min}" max="${max}" step="${step}" value="${value}" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-thumb sim-input-range" style="--thumb-color: ${thumbColor}"></div>`;
+            container.innerHTML = html;
+        };
+
+        const debouncedUpdateUI = debounce(updateUI, 250);
+
+        const handleDataChange = (field, value) => {
+            state.dataValues[field] = value === '' ? 0 : parseFloat(value);
+            state.simValues = { ...state.dataValues };
+            const calcs = calculateMetrics(state.dataValues);
+            state.targetG = calcs.g;
+            debouncedUpdateUI();
+        };
+
+        const handleSimChange = (field, value) => {
+            const numericValue = value === '' ? 0 : parseFloat(value);
+            if (field === 'g') { state.targetG = numericValue; } 
+            else { state.simValues[field] = numericValue; }
+            debouncedUpdateUI();
+        };
+
+        elements.btnDataTab.addEventListener('click', () => { state.activeTab = 'data'; updateUI(); });
+        elements.btnSimTab.addEventListener('click', () => { state.activeTab = 'simulation'; updateUI(); });
+
+        ['p', 'v', 'q', 'f'].forEach(field => {
+            elements[`data${field.charAt(0).toUpperCase() + field.slice(1)}`].addEventListener('input', (e) => {
+                handleDataChange(field, e.target.value);
+            });
+        });
+        
+        elements.simTab.addEventListener('input', (e) => {
+            if(e.target.matches('.sim-input-number, .sim-input-range')) {
+                handleSimChange(e.target.dataset.field, e.target.value);
+            }
+        });
+
+        const init = () => {
+            state.simValues = { ...state.dataValues };
+            const initialCalcs = calculateMetrics(state.dataValues);
+            state.targetG = initialCalcs.g;
+            updateUI();
+        };
+
+        init();
+    });
+    </script>
+</body>
+</html>
+
